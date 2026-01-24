@@ -7,7 +7,8 @@ metadata:
 data:
   config.yaml: |
     prometheus:
-      url: "http://prometheus-server:9090"
+      # Prometheus monitoring namespace'de (prometheus/ klasöründeki manifest'lerle kurulur)
+      url: "http://prometheus-server.monitoring:9090"
       timeout: "30s"
     
     ml_service:

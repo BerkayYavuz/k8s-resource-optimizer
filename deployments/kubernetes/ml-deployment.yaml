@@ -21,8 +21,8 @@ spec:
     spec:
       containers:
         - name: ml-service
-          image: k8s-resource-optimizer-ml:latest
-          imagePullPolicy: IfNotPresent
+          image: berkayyvz/k8s-resource-optimizer-ml:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 5000

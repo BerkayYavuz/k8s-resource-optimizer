@@ -22,15 +22,16 @@ spec:
       serviceAccountName: k8s-resource-optimizer
       containers:
         - name: optimizer
-          image: k8s-resource-optimizer:latest
-          imagePullPolicy: IfNotPresent
+          image: berkayyvz/k8s-resource-optimizer:latest
+          imagePullPolicy: Always
+          command: ["./optimizer"]
+          args:
+            - "-config"
+            - "/etc/optimizer/config.yaml"
           ports:
             - name: http
               containerPort: 8080
               protocol: TCP
-          env:
-            - name: CONFIG_PATH
-              value: "/etc/optimizer/config.yaml"
           volumeMounts:
             - name: config
               mountPath: /etc/optimizer
