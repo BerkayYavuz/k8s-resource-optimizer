@@ -126,6 +126,10 @@ class ProphetModel:
         # Remove duplicates and sort
         df = df.drop_duplicates(subset=['ds']).sort_values('ds')
         
+        # Prophet requires timezone-naive datetimes
+        if not df.empty and pd.api.types.is_datetime64tz_dtype(df['ds']):
+            df['ds'] = df['ds'].dt.tz_localize(None)
+        
         return df
     
     def _extract_trend(self, forecast: pd.DataFrame) -> str:
