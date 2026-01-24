@@ -1,0 +1,36 @@
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o optimizer ./cmd/optimizer
+
+# Runtime stage
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /root/
+
+# Copy the binary from builder
+COPY --from=builder /app/optimizer .
+COPY --from=builder /app/configs ./configs
+
+# Create non-root user
+RUN addgroup -g 1000 optimizer && \
+    adduser -D -u 1000 -G optimizer optimizer && \
+    chown -R optimizer:optimizer /root
+
+USER optimizer
+
+EXPOSE 8080
+
+CMD ["./optimizer", "-config", "configs/config.yaml"]

@@ -1,0 +1,57 @@
+# Kubernetes Resource Optimizer Configuration
+
+prometheus:
+  # Prometheus server URL
+  url: "http://prometheus-server:9090"
+  # Optional authentication
+  # username: ""
+  # password: ""
+  timeout: "30s"
+
+ml_service:
+  # ML service URL
+  url: "http://ml-service:5000"
+  timeout: "60s"
+
+kubernetes:
+  # Run inside Kubernetes cluster (uses in-cluster config)
+  in_cluster: true
+  # Path to kubeconfig (if not in_cluster)
+  # kubeconfig_path: "~/.kube/config"
+  
+  # Namespaces to exclude from analysis (system namespaces)
+  exclude_namespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+
+optimizer:
+  # Safety margins for resource recommendations
+  # Requests safety margin: recommended = predicted_avg * (1 + margin)
+  safety_margin_requests: 0.15  # 15% buffer
+  
+  # Limits safety margin: recommended = predicted_peak * (1 + margin)
+  safety_margin_limits: 0.25    # 25% buffer
+  
+  # Minimum thresholds to prevent under-provisioning
+  min_thresholds:
+    cpu_cores: 0.01   # 10 millicores
+    memory_mb: 32     # 32MB
+  
+  # Dry-run mode: if true, never apply changes, only recommend
+  dry_run: true
+
+api:
+  # API server settings
+  port: 8080
+  host: "0.0.0.0"
+
+analysis:
+  # Analysis window in days (how far back to look at metrics)
+  window_days: 14
+  
+  # How often to run analysis (in minutes)
+  interval_minutes: 60
+  
+  # Prometheus metric resolution
+  metric_resolution: "5m"

@@ -1,0 +1,266 @@
+{
+  "dashboard": {
+    "title": "Kubernetes Resource Optimizer Dashboard",
+    "tags": ["kubernetes", "optimization", "resources"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Pods Analyzed",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "k8s_optimizer_pods_analyzed",
+            "legendFormat": "Pods"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 2,
+        "title": "Potential CPU Savings (Cores)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "k8s_optimizer_cpu_savings_cores",
+            "legendFormat": "CPU Cores"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 2,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 10, "color": "red"}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 3,
+        "title": "Potential Memory Savings (GB)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "k8s_optimizer_memory_savings_mb / 1024",
+            "legendFormat": "Memory GB"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "decgbytes",
+            "decimals": 2,
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 50, "color": "red"}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 4,
+        "title": "Average Confidence Score",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "k8s_optimizer_avg_confidence * 100",
+            "legendFormat": "Confidence %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 50, "color": "yellow"},
+                {"value": 75, "color": "green"}
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        }
+      },
+      {
+        "id": 5,
+        "title": "CPU Waste by Pod",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(20, (sum(kube_pod_container_resource_requests{resource=\"cpu\"}) by (pod, namespace) - sum(rate(container_cpu_usage_seconds_total{container!=\"POD\"}[5m])) by (pod, namespace)))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "namespace": 0,
+                "pod": 1,
+                "Value": 2
+              },
+              "renameByName": {
+                "Value": "Wasted CPU (cores)"
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Memory Waste by Pod",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(20, (sum(kube_pod_container_resource_requests{resource=\"memory\"}) by (pod, namespace) - sum(container_memory_working_set_bytes{container!=\"POD\"}) by (pod, namespace)) / 1024 / 1024 / 1024)",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "namespace": 0,
+                "pod": 1,
+                "Value": 2
+              },
+              "renameByName": {
+                "Value": "Wasted Memory (GB)"
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 12,
+          "h": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "CPU Request Utilization Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"POD\"}[5m])) by (pod) / sum(kube_pod_container_resource_requests{resource=\"cpu\"}) by (pod) * 100",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "axisLabel": "Utilization %"
+            }
+          }
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 24,
+          "h": 8
+        }
+      },
+      {
+        "id": 8,
+        "title": "Memory Request Utilization Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{container!=\"POD\"}) by (pod) / sum(kube_pod_container_resource_requests{resource=\"memory\"}) by (pod) * 100",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "axisLabel": "Utilization %"
+            }
+          }
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 24,
+          "h": 8
+        }
+      },
+      {
+        "id": 9,
+        "title": "Cluster-Wide Resource Waste",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) - sum(rate(container_cpu_usage_seconds_total{container!=\"POD\"}[5m]))",
+            "legendFormat": "CPU (cores)"
+          },
+          {
+            "expr": "(sum(kube_pod_container_resource_requests{resource=\"memory\"}) - sum(container_memory_working_set_bytes{container!=\"POD\"})) / 1024 / 1024 / 1024",
+            "legendFormat": "Memory (GB)"
+          }
+        ],
+        "gridPos": {
+          "x": 0,
+          "y": 28,
+          "w": 24,
+          "h": 8
+        }
+      }
+    ]
+  }
+}

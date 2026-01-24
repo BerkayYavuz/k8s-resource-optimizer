@@ -1,0 +1,68 @@
+# Kubernetes Resource Optimizer Configuration - LOCAL DEVELOPMENT
+
+prometheus:
+  # Update to your local Prometheus instance
+  # If using Kubernetes Prometheus, port-forward it:
+  # kubectl port-forward -n monitoring svc/prometheus-server 9090:9090
+  url: "http://localhost:9090"
+  
+  # Optional authentication
+  # username: ""
+  # password: ""
+  timeout: "30s"
+
+ml_service:
+  # Local ML service on default Flask port
+  url: "http://localhost:5000"
+  timeout: "60s"
+
+kubernetes:
+  # Use local kubeconfig instead of in-cluster config
+  in_cluster: false
+  
+  # Path to your kubeconfig file (Windows paths)
+  # Default location for most users
+  kubeconfig_path: "~/.kube/config"
+  # Or specify full path:
+  # kubeconfig_path: "C:/Users/YourUsername/.kube/config"
+  
+  # Namespaces to exclude from analysis (system namespaces)
+  exclude_namespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+    - default  # Remove this if you want to analyze default namespace
+
+optimizer:
+  # Safety margins for resource recommendations
+  # Requests safety margin: recommended = predicted_avg * (1 + margin)
+  safety_margin_requests: 0.15  # 15% buffer
+  
+  # Limits safety margin: recommended = predicted_peak * (1 + margin)
+  safety_margin_limits: 0.25    # 25% buffer
+  
+  # Minimum thresholds to prevent under-provisioning
+  min_thresholds:
+    cpu_cores: 0.01   # 10 millicores
+    memory_mb: 32     # 32MB
+  
+  # DRY-RUN MODE: Keep this TRUE for local development!
+  # This prevents accidentally applying changes to your cluster
+  dry_run: true
+
+api:
+  # API server settings
+  port: 8080
+  host: "0.0.0.0"
+
+analysis:
+  # Analysis window in days (how far back to look at metrics)
+  window_days: 14
+  
+  # How often to run analysis (in minutes)
+  # For local dev, set to a high number to avoid constant analysis
+  # Or set to 1440 (24 hours) to only run once on startup
+  interval_minutes: 1440
+  
+  # Prometheus metric resolution
+  metric_resolution: "5m"

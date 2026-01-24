@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8s-resource-optimizer
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-resource-optimizer
+rules:
+  # Read pods across all namespaces
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  
+  # Read pod metrics (if metrics-server is installed)
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  
+  # Read namespaces
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  
+  # Optional: Update pods (only if auto-apply is enabled)
+  # Commented out by default for safety
+  # - apiGroups: [""]
+  #   resources: ["pods"]
+  #   verbs: ["patch", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-resource-optimizer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8s-resource-optimizer
+subjects:
+  - kind: ServiceAccount
+    name: k8s-resource-optimizer
+    namespace: default

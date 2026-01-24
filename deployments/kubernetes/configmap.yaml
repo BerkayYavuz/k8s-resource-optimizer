@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: optimizer-config
+  namespace: default
+data:
+  config.yaml: |
+    prometheus:
+      url: "http://prometheus-server:9090"
+      timeout: "30s"
+    
+    ml_service:
+      url: "http://ml-service:5000"
+      timeout: "60s"
+    
+    kubernetes:
+      in_cluster: true
+      exclude_namespaces:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+    
+    optimizer:
+      safety_margin_requests: 0.15
+      safety_margin_limits: 0.25
+      min_thresholds:
+        cpu_cores: 0.01
+        memory_mb: 32
+      dry_run: true  # IMPORTANT: Change to false to enable auto-apply
+    
+    api:
+      port: 8080
+      host: "0.0.0.0"
+    
+    analysis:
+      window_days: 14
+      interval_minutes: 60
+      metric_resolution: "5m"

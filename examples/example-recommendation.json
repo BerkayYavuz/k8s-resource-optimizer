@@ -1,0 +1,70 @@
+{
+    "pod_name": "web-app-7d4f8b9c",
+    "namespace": "production",
+    "timestamp": "2026-01-06T19:00:00Z",
+    "containers": {
+        "nginx": {
+            "container": "nginx",
+            "current": {
+                "cpu_request": 1.0,
+                "cpu_limit": 2.0,
+                "memory_request": 1024,
+                "memory_limit": 2048
+            },
+            "predicted": {
+                "avg_cpu": 0.15,
+                "peak_cpu": 0.35,
+                "avg_memory": 256,
+                "peak_memory": 512
+            },
+            "recommended_cpu_request": 0.173,
+            "recommended_cpu_limit": 0.438,
+            "recommended_memory_request": 294,
+            "recommended_memory_limit": 640,
+            "cpu_request_change_percent": -82.7,
+            "cpu_limit_change_percent": -78.1,
+            "memory_request_change_percent": -71.3,
+            "memory_limit_change_percent": -68.8,
+            "confidence": 0.87
+        },
+        "sidecar": {
+            "container": "sidecar",
+            "current": {
+                "cpu_request": 0.5,
+                "cpu_limit": 1.0,
+                "memory_request": 512,
+                "memory_limit": 1024
+            },
+            "predicted": {
+                "avg_cpu": 0.05,
+                "peak_cpu": 0.12,
+                "avg_memory": 128,
+                "peak_memory": 256
+            },
+            "recommended_cpu_request": 0.058,
+            "recommended_cpu_limit": 0.150,
+            "recommended_memory_request": 147,
+            "recommended_memory_limit": 320,
+            "cpu_request_change_percent": -88.4,
+            "cpu_limit_change_percent": -85.0,
+            "memory_request_change_percent": -71.3,
+            "memory_limit_change_percent": -68.8,
+            "confidence": 0.82
+        }
+    },
+    "potential_cpu_saving_cores": 1.289,
+    "potential_memory_saving_mb": 1389,
+    "cpu_waste_percentage": 86.0,
+    "memory_waste_percentage": 70.4,
+    "overall_confidence": 0.845,
+    "dry_run": true,
+    "analysis": {
+        "summary": "This pod is significantly over-provisioned. Current allocations are 5-10x higher than actual usage patterns. Recommended changes would save 1.29 CPU cores and 1.4 GB memory while maintaining safety margins.",
+        "risk_level": "low",
+        "recommendations": [
+            "Apply recommended changes during low-traffic window",
+            "Monitor post-change for 24-48 hours",
+            "Consider horizontal pod autoscaling if traffic varies significantly"
+        ]
+    }
+}
