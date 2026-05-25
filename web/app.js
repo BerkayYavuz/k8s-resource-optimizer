@@ -21,6 +21,11 @@ const els = {
   lastUpdated: document.querySelector("#lastUpdated"),
 };
 
+const savedApiBase = localStorage.getItem("optimizerApiBase");
+if (savedApiBase) {
+  els.apiBase.value = savedApiBase;
+}
+
 const statusLabels = {
   over_provisioned: "Over provisioned",
   under_provisioned: "Under provisioned",
@@ -342,6 +347,10 @@ async function loadRecommendations() {
 
 els.refreshButton.addEventListener("click", loadRecommendations);
 els.searchInput.addEventListener("input", render);
+els.apiBase.addEventListener("change", () => {
+  localStorage.setItem("optimizerApiBase", els.apiBase.value.trim());
+  loadRecommendations();
+});
 
 els.namespaceList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-namespace]");
