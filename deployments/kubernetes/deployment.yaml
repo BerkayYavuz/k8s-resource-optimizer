@@ -23,7 +23,7 @@ spec:
       containers:
         - name: optimizer
           image: berkayyvz/k8s-resource-optimizer:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command: ["./optimizer"]
           args:
             - "-config"

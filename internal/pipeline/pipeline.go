@@ -86,9 +86,13 @@ func (p *Pipeline) processTimeSeries(points []collector.TimeSeriesPoint, metricT
 	// Convert to output format
 	output := make([]DataPoint, len(cleaned))
 	for i, point := range cleaned {
+		value := point.Value
+		if metricType == collector.MetricTypeMemory {
+			value = value / (1024 * 1024)
+		}
 		output[i] = DataPoint{
 			Timestamp: point.Timestamp.Format(time.RFC3339),
-			Value:     point.Value,
+			Value:     value,
 		}
 	}
 

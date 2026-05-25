@@ -22,18 +22,18 @@ spec:
       containers:
         - name: ml-service
           image: berkayyvz/k8s-resource-optimizer-ml:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 5000
               protocol: TCP
           resources:
             requests:
-              cpu: 500m
-              memory: 1Gi
+              cpu: 250m
+              memory: 512Mi
             limits:
-              cpu: 2000m
-              memory: 4Gi
+              cpu: 1000m
+              memory: 2Gi
           livenessProbe:
             httpGet:
               path: /health

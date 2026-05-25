@@ -9,12 +9,12 @@ import (
 
 // Config holds the complete system configuration
 type Config struct {
-	Prometheus   PrometheusConfig   `yaml:"prometheus"`
-	MLService    MLServiceConfig    `yaml:"ml_service"`
-	Kubernetes   KubernetesConfig   `yaml:"kubernetes"`
-	Optimizer    OptimizerConfig    `yaml:"optimizer"`
-	API          APIConfig          `yaml:"api"`
-	Analysis     AnalysisConfig     `yaml:"analysis"`
+	Prometheus PrometheusConfig `yaml:"prometheus"`
+	MLService  MLServiceConfig  `yaml:"ml_service"`
+	Kubernetes KubernetesConfig `yaml:"kubernetes"`
+	Optimizer  OptimizerConfig  `yaml:"optimizer"`
+	API        APIConfig        `yaml:"api"`
+	Analysis   AnalysisConfig   `yaml:"analysis"`
 }
 
 // PrometheusConfig contains Prometheus connection settings
@@ -36,16 +36,17 @@ type KubernetesConfig struct {
 	InCluster         bool     `yaml:"in_cluster"`
 	KubeconfigPath    string   `yaml:"kubeconfig_path,omitempty"`
 	ExcludeNamespaces []string `yaml:"exclude_namespaces"`
+	ExcludeLabels     []string `yaml:"exclude_labels"`
 }
 
 // OptimizerConfig contains optimization engine settings
 type OptimizerConfig struct {
-	SafetyMarginRequests float64           `yaml:"safety_margin_requests"`
-	SafetyMarginLimits   float64           `yaml:"safety_margin_limits"`
-	MinCPUCores          float64           `yaml:"min_cpu_cores"`
-	MinMemoryMB          int64             `yaml:"min_memory_mb"`
-	DryRun               bool              `yaml:"dry_run"`
-	MinThresholds        MinThresholds     `yaml:"min_thresholds"`
+	SafetyMarginRequests float64       `yaml:"safety_margin_requests"`
+	SafetyMarginLimits   float64       `yaml:"safety_margin_limits"`
+	MinCPUCores          float64       `yaml:"min_cpu_cores"`
+	MinMemoryMB          int64         `yaml:"min_memory_mb"`
+	DryRun               bool          `yaml:"dry_run"`
+	MinThresholds        MinThresholds `yaml:"min_thresholds"`
 }
 
 // MinThresholds defines minimum resource thresholds

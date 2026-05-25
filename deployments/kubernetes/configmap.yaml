@@ -21,6 +21,11 @@ data:
         - kube-system
         - kube-public
         - kube-node-lease
+        - monitoring
+      exclude_labels:
+        - app=k8s-resource-optimizer
+        - component=optimizer
+        - component=ml-service
     
     optimizer:
       safety_margin_requests: 0.15

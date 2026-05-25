@@ -32,6 +32,11 @@ kubernetes:
     - kube-public
     - kube-node-lease
     - default  # Remove this if you want to analyze default namespace
+    - monitoring
+  exclude_labels:
+    - app=k8s-resource-optimizer
+    - component=optimizer
+    - component=ml-service
 
 optimizer:
   # Safety margins for resource recommendations

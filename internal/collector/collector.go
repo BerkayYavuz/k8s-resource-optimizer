@@ -16,9 +16,9 @@ import (
 
 // Collector handles metrics collection from Prometheus
 type Collector struct {
-	client     *http.Client
-	config     *config.PrometheusConfig
-	baseURL    string
+	client  *http.Client
+	config  *config.PrometheusConfig
+	baseURL string
 }
 
 // NewCollector creates a new Prometheus metrics collector
@@ -80,8 +80,8 @@ func (c *Collector) CollectPodMetrics(ctx context.Context, namespace, podName st
 
 // queryMetric queries Prometheus for a specific metric type
 func (c *Collector) queryMetric(ctx context.Context, namespace, podName string, metricType MetricType, start, end time.Time) ([]TimeSeries, error) {
-	query := c.buildQuery(namespace, podName, metricType)
-	
+	query := c.buildQuery(namespace, podName, metricType, true)
+
 	log.Printf("Querying Prometheus: %s (from %s to %s)", query, start.Format(time.RFC3339), end.Format(time.RFC3339))
 
 	result, err := c.queryRange(ctx, query, start, end, 5*time.Minute)
@@ -89,23 +89,44 @@ func (c *Collector) queryMetric(ctx context.Context, namespace, podName string, 
 		return nil, err
 	}
 
-	return c.parseResults(result, metricType)
+	series, err := c.parseResults(result, metricType)
+	if err != nil {
+		return nil, err
+	}
+	if len(series) > 0 {
+		return series, nil
+	}
+
+	fallbackQuery := c.buildQuery(namespace, podName, metricType, false)
+	log.Printf("No container-labeled metrics found; retrying Prometheus query without container filter: %s", fallbackQuery)
+
+	fallbackResult, err := c.queryRange(ctx, fallbackQuery, start, end, 5*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.parseResults(fallbackResult, metricType)
 }
 
 // buildQuery constructs a Prometheus query for the specified metric
-func (c *Collector) buildQuery(namespace, podName string, metricType MetricType) string {
+func (c *Collector) buildQuery(namespace, podName string, metricType MetricType, requireContainerLabel bool) string {
+	containerFilter := ""
+	if requireContainerLabel {
+		containerFilter = `,container!="",container!="POD"`
+	}
+
 	switch metricType {
 	case MetricTypeCPU:
 		// Rate of CPU usage in cores
 		return fmt.Sprintf(
-			`rate(container_cpu_usage_seconds_total{namespace="%s",pod="%s",container!="",container!="POD"}[5m])`,
-			namespace, podName,
+			`rate(container_cpu_usage_seconds_total{namespace="%s",pod="%s"%s}[5m])`,
+			namespace, podName, containerFilter,
 		)
 	case MetricTypeMemory:
 		// Working set memory in bytes
 		return fmt.Sprintf(
-			`container_memory_working_set_bytes{namespace="%s",pod="%s",container!="",container!="POD"}`,
-			namespace, podName,
+			`container_memory_working_set_bytes{namespace="%s",pod="%s"%s}`,
+			namespace, podName, containerFilter,
 		)
 	default:
 		return ""
@@ -174,6 +195,8 @@ func (c *Collector) parseResults(result *PrometheusQueryResult, metricType Metri
 		}
 		if container, ok := matrixResult.Metric["container"]; ok {
 			ts.Container = container
+		} else {
+			ts.Container = PodLevelContainerName
 		}
 
 		// Parse data points

@@ -10,6 +10,11 @@ type MetricType string
 const (
 	MetricTypeCPU    MetricType = "cpu"
 	MetricTypeMemory MetricType = "memory"
+
+	// PodLevelContainerName marks cAdvisor metrics that do not expose a
+	// container label. The optimizer can map this to a real container name
+	// when the pod has a single container.
+	PodLevelContainerName = "__pod__"
 )
 
 // TimeSeriesPoint represents a single data point in a time series
@@ -20,13 +25,13 @@ type TimeSeriesPoint struct {
 
 // TimeSeries represents a complete time series for a metric
 type TimeSeries struct {
-	PodName     string            `json:"pod_name"`
-	Namespace   string            `json:"namespace"`
-	Container   string            `json:"container"`
-	MetricType  MetricType        `json:"metric_type"`
-	DataPoints  []TimeSeriesPoint `json:"data_points"`
-	StartTime   time.Time         `json:"start_time"`
-	EndTime     time.Time         `json:"end_time"`
+	PodName    string            `json:"pod_name"`
+	Namespace  string            `json:"namespace"`
+	Container  string            `json:"container"`
+	MetricType MetricType        `json:"metric_type"`
+	DataPoints []TimeSeriesPoint `json:"data_points"`
+	StartTime  time.Time         `json:"start_time"`
+	EndTime    time.Time         `json:"end_time"`
 }
 
 // PodMetrics contains all metrics for a specific pod
@@ -40,7 +45,7 @@ type PodMetrics struct {
 
 // PrometheusQueryResult represents a raw Prometheus query response
 type PrometheusQueryResult struct {
-	Status string             `json:"status"`
+	Status string              `json:"status"`
 	Data   PrometheusQueryData `json:"data"`
 }
 
@@ -52,8 +57,8 @@ type PrometheusQueryData struct {
 
 // PrometheusMatrixResult represents a matrix result from Prometheus
 type PrometheusMatrixResult struct {
-	Metric map[string]string    `json:"metric"`
-	Values [][]interface{}      `json:"values"`
+	Metric map[string]string `json:"metric"`
+	Values [][]interface{}   `json:"values"`
 }
 
 // MetricStats contains statistical information about a metric

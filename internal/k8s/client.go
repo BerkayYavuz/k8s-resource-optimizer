@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/k8s-resource-optimizer/optimizer/internal/config"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +20,7 @@ import (
 type Client struct {
 	clientset         *kubernetes.Clientset
 	excludeNamespaces map[string]bool
+	excludeLabels     map[string]string
 }
 
 // NewClient creates a new Kubernetes client
@@ -55,9 +57,20 @@ func NewClient(cfg *config.KubernetesConfig) (*Client, error) {
 		excludeMap[ns] = true
 	}
 
+	excludeLabels := make(map[string]string)
+	for _, label := range cfg.ExcludeLabels {
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) != 2 {
+			log.Printf("Warning: ignoring invalid exclude label %q, expected key=value", label)
+			continue
+		}
+		excludeLabels[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+
 	return &Client{
 		clientset:         clientset,
 		excludeNamespaces: excludeMap,
+		excludeLabels:     excludeLabels,
 	}, nil
 }
 
@@ -86,6 +99,10 @@ func (c *Client) ListPods(ctx context.Context) ([]corev1.Pod, error) {
 
 		// Filter to only running pods
 		for _, pod := range pods.Items {
+			if c.IsPodExcluded(&pod) {
+				log.Printf("Skipping excluded pod by label: %s/%s", pod.Namespace, pod.Name)
+				continue
+			}
 			if pod.Status.Phase == corev1.PodRunning {
 				allPods = append(allPods, pod)
 			}
@@ -139,4 +156,14 @@ func GetPodResourceRequests(pod *corev1.Pod) map[string]ContainerResources {
 // IsNamespaceExcluded checks if a namespace should be excluded
 func (c *Client) IsNamespaceExcluded(namespace string) bool {
 	return c.excludeNamespaces[namespace]
+}
+
+// IsPodExcluded checks if a pod should be excluded by configured labels.
+func (c *Client) IsPodExcluded(pod *corev1.Pod) bool {
+	for key, value := range c.excludeLabels {
+		if pod.Labels[key] == value {
+			return true
+		}
+	}
+	return false
 }

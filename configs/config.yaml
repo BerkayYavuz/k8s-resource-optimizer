@@ -24,6 +24,11 @@ kubernetes:
     - kube-system
     - kube-public
     - kube-node-lease
+    - monitoring
+  exclude_labels:
+    - app=k8s-resource-optimizer
+    - component=optimizer
+    - component=ml-service
 
 optimizer:
   # Safety margins for resource recommendations

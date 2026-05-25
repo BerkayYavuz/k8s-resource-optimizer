@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/k8s-resource-optimizer/optimizer/internal/k8s"
 	"github.com/k8s-resource-optimizer/optimizer/internal/optimizer"
 	"github.com/k8s-resource-optimizer/optimizer/internal/pipeline"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func main() {
@@ -145,6 +147,10 @@ func runAnalysis(
 			continue
 		}
 
+		// Get current resource configuration
+		currentResources := k8s.GetPodResourceRequests(&pod)
+		normalizePodLevelMetrics(metrics, currentResources)
+
 		// Process metrics through pipeline
 		mlInput, err := dataPipeline.ProcessMetrics(metrics)
 		if err != nil {
@@ -153,9 +159,6 @@ func runAnalysis(
 			continue
 		}
 
-		// Get current resource configuration
-		currentResources := k8s.GetPodResourceRequests(&pod)
-
 		// Generate recommendations
 		recommendation, err := optimizationEngine.GenerateRecommendations(ctx, mlInput, currentResources)
 		if err != nil {
@@ -163,6 +166,8 @@ func runAnalysis(
 			errorCount++
 			continue
 		}
+		recommendation.NodeName = pod.Spec.NodeName
+		recommendation.WorkloadName, recommendation.WorkloadType = resolveWorkload(pod.Name, pod.OwnerReferences)
 
 		// Store recommendation in API server
 		apiServer.StoreRecommendation(recommendation)
@@ -183,4 +188,57 @@ func runAnalysis(
 
 	elapsed := time.Since(startTime)
 	log.Printf("Analysis complete: %d successful, %d errors, duration: %v", successCount, errorCount, elapsed)
+}
+
+func normalizePodLevelMetrics(metrics *collector.PodMetrics, currentResources map[string]k8s.ContainerResources) {
+	if len(currentResources) != 1 {
+		return
+	}
+
+	containerName := ""
+	for name := range currentResources {
+		containerName = name
+	}
+
+	renamed := false
+	for i := range metrics.CPU {
+		if metrics.CPU[i].Container == collector.PodLevelContainerName {
+			metrics.CPU[i].Container = containerName
+			renamed = true
+		}
+	}
+	for i := range metrics.Memory {
+		if metrics.Memory[i].Container == collector.PodLevelContainerName {
+			metrics.Memory[i].Container = containerName
+			renamed = true
+		}
+	}
+
+	if renamed {
+		metrics.Containers = []string{containerName}
+		log.Printf("Mapped pod-level metrics for %s/%s to single container %q", metrics.Namespace, metrics.PodName, containerName)
+	}
+}
+
+func resolveWorkload(podName string, owners []metav1.OwnerReference) (string, string) {
+	if len(owners) == 0 {
+		return podName, "Pod"
+	}
+
+	owner := owners[0]
+	if owner.Kind == "ReplicaSet" {
+		if deploymentName := trimReplicaSetHash(owner.Name); deploymentName != "" {
+			return deploymentName, "Deployment"
+		}
+	}
+
+	return owner.Name, owner.Kind
+}
+
+func trimReplicaSetHash(name string) string {
+	index := strings.LastIndex(name, "-")
+	if index <= 0 {
+		return name
+	}
+	return name[:index]
 }

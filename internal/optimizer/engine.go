@@ -48,11 +48,11 @@ func (e *Engine) GenerateRecommendations(ctx context.Context, mlInput *pipeline.
 	}
 
 	recommendation := &PodRecommendation{
-		PodName:     mlInput.PodName,
-		Namespace:   mlInput.Namespace,
-		Timestamp:   time.Now(),
-		Containers:  make(map[string]ContainerRecommendation),
-		DryRun:      e.config.DryRun,
+		PodName:    mlInput.PodName,
+		Namespace:  mlInput.Namespace,
+		Timestamp:  time.Now(),
+		Containers: make(map[string]ContainerRecommendation),
+		DryRun:     e.config.DryRun,
 	}
 
 	totalCurrentCPU := 0.0
@@ -66,6 +66,11 @@ func (e *Engine) GenerateRecommendations(ctx context.Context, mlInput *pipeline.
 		if !exists {
 			log.Printf("Warning: no current resources found for container %s", containerName)
 			current = k8s.ContainerResources{Name: containerName}
+		}
+
+		containerMetrics, hasMetrics := mlInput.Metrics[containerName]
+		if hasMetrics {
+			pred = e.sanitizePrediction(containerName, pred, containerMetrics)
 		}
 
 		// Calculate recommended resources
@@ -82,6 +87,7 @@ func (e *Engine) GenerateRecommendations(ctx context.Context, mlInput *pipeline.
 	// Calculate savings
 	recommendation.PotentialCPUSavingCores = totalCurrentCPU - totalRecommendedCPU
 	recommendation.PotentialMemorySavingMB = totalCurrentMemory - totalRecommendedMemory
+	recommendation.Impact = buildImpact(recommendation.PotentialCPUSavingCores, recommendation.PotentialMemorySavingMB)
 
 	// Calculate waste percentage
 	if totalCurrentCPU > 0 {
@@ -99,8 +105,168 @@ func (e *Engine) GenerateRecommendations(ctx context.Context, mlInput *pipeline.
 	if len(predictions.Predictions) > 0 {
 		recommendation.OverallConfidence = totalConfidence / float64(len(predictions.Predictions))
 	}
+	recommendation.Status, recommendation.Reason = classifyRecommendation(recommendation)
+	recommendation.Severity = classifySeverity(recommendation)
 
 	return recommendation, nil
+}
+
+func buildImpact(cpuDelta float64, memoryDelta int64) RecommendationImpact {
+	impact := RecommendationImpact{}
+	if cpuDelta >= 0 {
+		impact.CPUSavingsCores = cpuDelta
+	} else {
+		impact.CPUAdditionalCores = math.Abs(cpuDelta)
+		impact.RequiresAdditionalCPU = true
+	}
+
+	if memoryDelta >= 0 {
+		impact.MemorySavingsMB = memoryDelta
+	} else {
+		impact.MemoryAdditionalMB = -memoryDelta
+		impact.RequiresAdditionalMemory = true
+	}
+
+	impact.HasSavings = impact.CPUSavingsCores > 0 || impact.MemorySavingsMB > 0
+	return impact
+}
+
+func classifyRecommendation(rec *PodRecommendation) (string, string) {
+	if rec.OverallConfidence < 0.35 {
+		return "low_confidence", "Prediction confidence is low; collect more metrics before acting."
+	}
+	if rec.Impact.RequiresAdditionalCPU || rec.Impact.RequiresAdditionalMemory {
+		return "under_provisioned", "Recommended resources are higher than current requests for at least one resource."
+	}
+	if rec.Impact.CPUSavingsCores > 0 || rec.Impact.MemorySavingsMB > 0 {
+		return "over_provisioned", "Current requests appear higher than observed and predicted usage."
+	}
+	return "balanced", "Current resource requests are close to the recommendation."
+}
+
+func classifySeverity(rec *PodRecommendation) string {
+	maxChange := 0.0
+	for _, container := range rec.Containers {
+		maxChange = math.Max(maxChange, math.Abs(container.CPURequestChange))
+		maxChange = math.Max(maxChange, math.Abs(container.MemoryRequestChange))
+	}
+
+	if rec.Status == "under_provisioned" {
+		if maxChange >= 50 || rec.OverallConfidence >= 0.70 {
+			return "critical"
+		}
+		return "high"
+	}
+
+	if rec.Status == "low_confidence" {
+		if maxChange >= 80 {
+			return "medium"
+		}
+		return "low"
+	}
+
+	if maxChange >= 80 && rec.OverallConfidence >= 0.50 {
+		return "high"
+	}
+	if maxChange >= 50 {
+		return "medium"
+	}
+	return "low"
+}
+
+func (e *Engine) sanitizePrediction(containerName string, pred pipeline.MLPrediction, metrics pipeline.ContainerMetrics) pipeline.MLPrediction {
+	original := pred
+
+	pred.PredictedAvgCPU, pred.PredictedPeakCPU = sanitizeMetricPrediction(
+		pred.PredictedAvgCPU,
+		pred.PredictedPeakCPU,
+		metrics.CPUStats,
+	)
+	pred.PredictedAvgMem, pred.PredictedPeakMem = sanitizeMetricPrediction(
+		pred.PredictedAvgMem,
+		pred.PredictedPeakMem,
+		metrics.MemoryStats,
+	)
+
+	if !isFinite(pred.Confidence) || pred.Confidence < 0 {
+		pred.Confidence = 0
+	}
+	if pred.Confidence > 1 {
+		pred.Confidence = 1
+	}
+
+	if predictionChanged(original, pred) {
+		log.Printf("Sanitized prediction for container %s: cpu avg %.4f->%.4f peak %.4f->%.4f, memory avg %.2f->%.2f peak %.2f->%.2f",
+			containerName,
+			original.PredictedAvgCPU,
+			pred.PredictedAvgCPU,
+			original.PredictedPeakCPU,
+			pred.PredictedPeakCPU,
+			original.PredictedAvgMem,
+			pred.PredictedAvgMem,
+			original.PredictedPeakMem,
+			pred.PredictedPeakMem,
+		)
+	}
+
+	return pred
+}
+
+func sanitizeMetricPrediction(avg, peak float64, stats pipeline.MetricStatistics) (float64, float64) {
+	if !isFinite(avg) || avg < 0 {
+		avg = stats.Average
+	}
+	if !isFinite(peak) || peak < 0 {
+		peak = stats.Peak
+	}
+
+	if avg == 0 && stats.Average > 0 {
+		avg = stats.Average
+	}
+	if peak == 0 && stats.Peak > 0 {
+		peak = stats.Peak
+	}
+
+	avgCap := metricCap(stats.Average, stats.P95, stats.Peak)
+	peakCap := metricCap(stats.Peak, stats.P99, stats.Average)
+
+	if avgCap > 0 && avg > avgCap {
+		avg = avgCap
+	}
+	if peakCap > 0 && peak > peakCap {
+		peak = peakCap
+	}
+	if peak < avg {
+		peak = avg
+	}
+
+	return avg, peak
+}
+
+func metricCap(values ...float64) float64 {
+	maxValue := 0.0
+	for _, value := range values {
+		if isFinite(value) && value > maxValue {
+			maxValue = value
+		}
+	}
+	if maxValue == 0 {
+		return 0
+	}
+	return maxValue * 3
+}
+
+func isFinite(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func predictionChanged(before, after pipeline.MLPrediction) bool {
+	const epsilon = 0.000001
+	return math.Abs(before.PredictedAvgCPU-after.PredictedAvgCPU) > epsilon ||
+		math.Abs(before.PredictedPeakCPU-after.PredictedPeakCPU) > epsilon ||
+		math.Abs(before.PredictedAvgMem-after.PredictedAvgMem) > epsilon ||
+		math.Abs(before.PredictedPeakMem-after.PredictedPeakMem) > epsilon ||
+		math.Abs(before.Confidence-after.Confidence) > epsilon
 }
 
 // calculateRecommendation calculates recommended resources for a single container
